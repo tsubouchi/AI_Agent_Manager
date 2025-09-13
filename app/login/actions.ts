@@ -38,14 +38,11 @@ export async function guestSignIn(redirectTo?: string) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
+        getAll() {
+          return cookieStore.getAll().map((c) => ({ name: c.name, value: c.value }))
         },
-        set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name: string, options: any) {
-          cookieStore.delete({ name, ...options })
+        setAll(cookies) {
+          for (const c of cookies) cookieStore.set({ name: c.name!, value: c.value, ...c.options })
         },
       },
     }
@@ -54,4 +51,24 @@ export async function guestSignIn(redirectTo?: string) {
   const { error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw new Error(error.message)
   redirect(redirectTo || "/")
+}
+
+export async function serverSignOut(_formData?: FormData) {
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll().map((c) => ({ name: c.name, value: c.value }))
+        },
+        setAll(cookies) {
+          for (const c of cookies) cookieStore.set({ name: c.name!, value: c.value, ...c.options })
+        },
+      },
+    }
+  )
+  await supabase.auth.signOut()
+  redirect("/login")
 }

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSupabaseSidebar } from "@/hooks/use-supabase-sidebar"
 import { getSupabaseClient } from "@/lib/supabase"
+import { serverSignOut } from "@/app/login/actions"
 import { useState } from "react"
 
 // Simple SVG icon components to replace lucide-react
@@ -34,7 +35,7 @@ export function Sidebar() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const currentView = searchParams.get("view") || "chat"
-  const { projects, drafts, definitions, userEmail, orgId } = useSupabaseSidebar()
+  const { projects, drafts, definitions, userEmail, orgId, loading } = useSupabaseSidebar() as any
   const supabase = getSupabaseClient() as any
   const [showProjectForm, setShowProjectForm] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
@@ -59,14 +60,16 @@ export function Sidebar() {
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate">AI Agent Manager</div>
             <div className="text-xs text-muted-foreground truncate">
-              {userEmail ? userEmail : "未ログイン"}
+              {userEmail ?? (loading ? "…" : "未ログイン")}
               {orgId ? ` · org: ${orgId}` : ""}
             </div>
           </div>
           {userEmail && (
-            <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => supabase.auth.signOut()}>
-              ログアウト
-            </Button>
+            <form action={serverSignOut}>
+              <Button size="sm" variant="outline" className="h-7 px-2" type="submit">
+                ログアウト
+              </Button>
+            </form>
           )}
         </div>
       </div>

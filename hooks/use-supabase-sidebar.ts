@@ -35,12 +35,17 @@ export function useSupabaseSidebar() {
       if (!supabase) return
       setLoading(true)
       try {
-        const { data: userData } = await supabase.auth.getUser()
-        const uid = userData?.user?.id || null
-        const email = userData?.user?.email || null
-        const org = (userData?.user?.user_metadata?.org_id || userData?.user?.app_metadata?.org_id || null) as
-          | string
-          | null
+        // Fetch user info via server (cookie-based) to avoid client auth desync
+        const res = await fetch("/api/auth/user", { cache: "no-store" })
+        let uid: string | null = null
+        let email: string | null = null
+        let org: string | null = null
+        if (res.ok) {
+          const j = await res.json()
+          uid = (j?.id as string) || null
+          email = (j?.email as string) || null
+          org = (j?.orgId as string) || null
+        }
         if (mounted) setUserId(uid)
         if (mounted) setUserEmail(email)
         if (mounted) setOrgId(org)
