@@ -3,7 +3,7 @@
 import type React from "react"
 import { useWorkflow } from "@/hooks/use-workflow"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
@@ -47,6 +47,12 @@ export function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false)
   const [isComposing, setIsComposing] = useState(false)
   const [phaseAnimation, setPhaseAnimation] = useState("")
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null)
+  const [isOcrLoading, setIsOcrLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const endRef = useRef<HTMLDivElement>(null)
+  const [nearBottom, setNearBottom] = useState(true)
 
   const { stages, context, isRunning, startWorkflow, currentPhase } = useWorkflow()
 
@@ -182,6 +188,48 @@ export function ChatInterface() {
     setInput("")
   }
 
+  const handleAttachClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    setAttachmentPreview(url)
+    try {
+      setIsOcrLoading(true)
+      const form = new FormData()
+      form.append("image", file)
+      const res = await fetch("/api/ocr", { method: "POST", body: form })
+      if (!res.ok) throw new Error("OCR failed")
+      const data = (await res.json()) as { text?: string }
+      const text = data.text?.trim() || "(No text recognized)"
+      // Prefill input with OCR text and add a system-like message
+      setInput(text)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ocr-${Date.now()}`,
+          role: "assistant" as const,
+          content: `OCR抽出結果:\n${text}`,
+        },
+      ])
+    } catch (err) {
+      console.error(err)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ocr-error-${Date.now()}`,
+          role: "assistant" as const,
+          content: "画像の解析に失敗しました。時間をおいて再度お試しください。",
+        },
+      ])
+    } finally {
+      setIsOcrLoading(false)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
@@ -200,6 +248,31 @@ export function ChatInterface() {
   const handleCompositionEnd = () => {
     setIsComposing(false)
   }
+
+  // Auto-scroll handling
+  const scrollToBottom = (smooth = true) => {
+    if (endRef.current) {
+      endRef.current.scrollIntoView({ behavior: smooth ? "smooth" : "auto" })
+    }
+  }
+
+  const handleScroll = () => {
+    const el = scrollerRef.current
+    if (!el) return
+    const threshold = 64 // px
+    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight)
+    setNearBottom(distanceFromBottom <= threshold)
+  }
+
+  useEffect(() => {
+    // On mount, jump to bottom without animation
+    scrollToBottom(false)
+  }, [])
+
+  useEffect(() => {
+    // While new messages stream in, keep view pinned to bottom if user is near bottom
+    if (nearBottom) scrollToBottom(true)
+  }, [messages, isLoading, isRunning, isOcrLoading, phaseAnimation, nearBottom])
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -223,7 +296,11 @@ export function ChatInterface() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 max-h-[45vh]">
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 scroll-smooth"
+      >
         <div className="space-y-4">
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -231,10 +308,21 @@ export function ChatInterface() {
                 className={`max-w-[80%] p-4 ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-card"}`}
               >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                <p className="text-xs opacity-70 mt-2">{new Date().toLocaleTimeString()}</p>
+                <p className="text-xs opacity-70 mt-2" suppressHydrationWarning>
+                  {new Date().toLocaleTimeString()}
+                </p>
               </Card>
             </div>
           ))}
+          {attachmentPreview && (
+            <div className="flex justify-end">
+              <Card className="max-w-[80%] p-3 bg-primary text-primary-foreground">
+                <p className="text-xs opacity-80 mb-2">添付画像プレビュー</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={attachmentPreview} alt="attachment preview" className="max-h-40 rounded" />
+              </Card>
+            </div>
+          )}
           {(isLoading || isRunning) && (
             <div className="flex justify-start">
               <Card className="bg-card p-4">
@@ -245,6 +333,17 @@ export function ChatInterface() {
               </Card>
             </div>
           )}
+          {isOcrLoading && (
+            <div className="flex justify-start">
+              <Card className="bg-card p-3">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                  <p className="text-sm text-muted-foreground">画像を解析中...</p>
+                </div>
+              </Card>
+            </div>
+          )}
+          <div ref={endRef} />
         </div>
       </div>
 
@@ -358,9 +457,16 @@ export function ChatInterface() {
       <div className="sticky bottom-0 p-4 bg-background border-t border-border">
         <form onSubmit={handleSubmit}>
           <div className="flex items-start gap-2">
-            <Button variant="outline" size="sm" type="button">
+            <Button variant="outline" size="sm" type="button" onClick={handleAttachClick} disabled={isOcrLoading}>
               <Paperclip className="w-4 h-4" />
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
             <Button variant="outline" size="sm" type="button">
               <Tag className="w-4 h-4" />
             </Button>
@@ -374,7 +480,7 @@ export function ChatInterface() {
                 placeholder={
                   isComposing ? "Enterで確定、もう一度Enterで送信..." : "課題について詳しく教えてください..."
                 }
-                className="min-h-[6rem] max-h-[12rem] resize-y text-lg leading-7"
+                className="min-h-[3.5rem] max-h-[8rem] resize-y text-base leading-6"
                 autoFocus
                 disabled={isLoading || isRunning}
               />

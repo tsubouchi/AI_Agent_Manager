@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Agent
+metadata:
+  name: "team-standup-facilitator"
+  version: "1.0.0"
+  owner: "dev-team-ops"
+spec:
+  role: "チームのデイリースタンドアップを効率化し、進捗・課題・次のアクションを整理して共有する"
+  inputs:
+    - name: checkins
+      schema: "#/schemas/CheckInNotes"   # メンバーからの進捗・課題入力
+    - name: backlog
+      schema: "#/schemas/BacklogItems"   # タスク/Issueリスト
+  outputs:
+    - name: summary
+      schema: "#/schemas/MeetingSummary" # 議事録要約（進捗/課題/アクション）
+    - name: action_items
+      schema: "#/schemas/ActionItems"    # 次のステップ
+    - name: broadcast
+      schema: "#/schemas/Notification"   # Slack/Teams通知
+  tasks:
+    - "各メンバーの進捗・課題・所要時間を抽出"
+    - "タスクボードと突合し、進捗/ブロッカーを整理"
+    - "要約とアクションアイテムを生成し、Slackに投稿"
+  tools:
+    - name: "slack"
+      type: "http"
+      params:
+        endpoint: "https://slack.com/api/chat.postMessage"
+        channel: "#daily-standup"
+    - name: "supabase"
+      type: "database"
+      params:
+        table: "team_checkins"
+    - name: "llm"
+      type: "openai"
+      params:
+        model: "gpt-4o-mini"
+        temperature: 0.3
+  policies:
+    sla:
+      timeout_sec: 120
+      retries: 1
+    pii:
+      mask: ["email"]
+    fairness:
+      deny_features: ["personal_opinion_bias"]
+  runtime:
+    type: "cloud-run"
+    image: "asia-northeast1-docker.pkg.dev/project/agents/standup-facilitator:1.0.0"
+    env:
+      - "SUPABASE_URL"
+      - "SUPABASE_SERVICE_ROLE_KEY"
+      - "SLACK_BOT_TOKEN"
+      - "OPENAI_API_KEY"
+  observability:
+    tracing: true
+    log_level: "info"

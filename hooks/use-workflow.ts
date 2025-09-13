@@ -9,6 +9,7 @@ export function useWorkflow() {
   const [isRunning, setIsRunning] = useState(false)
   const [currentPhase, setCurrentPhase] = useState<string>("")
   const engineRef = useRef<WorkflowEngine>()
+  const startedRef = useRef(false)
 
   useEffect(() => {
     engineRef.current = new WorkflowEngine()
@@ -19,7 +20,13 @@ export function useWorkflow() {
 
       const hasRunningStage = newStages.some((stage) => stage.status === "running")
       const hasPendingStage = newStages.some((stage) => stage.status === "pending")
-      setIsRunning(hasRunningStage || hasPendingStage)
+      // Consider "running" only when a stage is actively running, or when a started workflow still has pending stages
+      setIsRunning(hasRunningStage || (startedRef.current && hasPendingStage))
+
+      // Reset started flag when all stages are completed or errored (no pending/running)
+      if (!hasRunningStage && !hasPendingStage) {
+        startedRef.current = false
+      }
 
       const runningStage = newStages.find((stage) => stage.status === "running")
       if (runningStage) {
@@ -41,6 +48,7 @@ export function useWorkflow() {
 
   const startWorkflow = async (userInput: string) => {
     if (engineRef.current) {
+      startedRef.current = true
       setIsRunning(true)
       await engineRef.current.startWorkflow(userInput)
     }
