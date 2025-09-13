@@ -1,17 +1,15 @@
 "use client"
 
 import type React from "react"
+import { useWorkflow } from "@/hooks/use-workflow"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
 import { Send, Paperclip, Tag, Zap } from "lucide-react"
 
 export function ChatInterface() {
-  const [currentMode, setCurrentMode] = useState<"pain-analysis" | "solution-design" | "agent-generation" | "general">(
-    "general",
-  )
   const [messages, setMessages] = useState([
     {
       id: "system-1",
@@ -22,10 +20,28 @@ export function ChatInterface() {
   ])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isComposing, setIsComposing] = useState(false)
+  const [phaseAnimation, setPhaseAnimation] = useState("")
+
+  const { stages, context, isRunning, startWorkflow, currentPhase } = useWorkflow()
+
+  useEffect(() => {
+    if (isRunning && currentPhase) {
+      let dots = 0
+      const interval = setInterval(() => {
+        dots = (dots + 1) % 4
+        setPhaseAnimation(`${currentPhase} ${".".repeat(dots)}`)
+      }, 100)
+
+      return () => clearInterval(interval)
+    } else {
+      setPhaseAnimation("")
+    }
+  }, [isRunning, currentPhase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading) return
+    if (!input.trim() || isLoading || isRunning || isComposing) return
 
     const userMessage = {
       id: Date.now().toString(),
@@ -45,7 +61,7 @@ export function ChatInterface() {
         },
         body: JSON.stringify({
           messages: [...messages, userMessage],
-          mode: currentMode,
+          context: context,
         }),
       })
 
@@ -110,6 +126,12 @@ export function ChatInterface() {
           ),
         )
       }
+
+      if (assistantMessage.includes("課題") || assistantMessage.includes("問題") || input.includes("Pain")) {
+        setTimeout(() => {
+          startWorkflow(input)
+        }, 1000)
+      }
     } catch (error) {
       console.error("Chat error:", error)
       setMessages((prev) =>
@@ -128,21 +150,30 @@ export function ChatInterface() {
     setInput(e.target.value)
   }
 
-  const handleAIExecution = () => {
-    if (currentMode === "general") {
-      setCurrentMode("pain-analysis")
-    } else if (currentMode === "pain-analysis") {
-      setCurrentMode("solution-design")
-    } else if (currentMode === "solution-design") {
-      setCurrentMode("agent-generation")
-    }
+  const handleAIExecution = async () => {
+    if (!input.trim()) return
+
+    await startWorkflow(input)
+    setInput("")
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      handleSubmit(e)
+      if (isComposing) {
+        setIsComposing(false)
+      } else {
+        handleSubmit(e)
+      }
     }
+  }
+
+  const handleCompositionStart = () => {
+    setIsComposing(true)
+  }
+
+  const handleCompositionEnd = () => {
+    setIsComposing(false)
   }
 
   return (
@@ -156,12 +187,18 @@ export function ChatInterface() {
           </div>
           <div>
             <h2 className="font-medium">コンサル型AI</h2>
-            <p className="text-xs text-muted-foreground">Mode: {currentMode} | ctx: problem.yaml / personas / logs</p>
+            <p className="text-xs text-muted-foreground">
+              {phaseAnimation ||
+                (isRunning
+                  ? `実行中: ${stages.find((s) => s.status === "running")?.name || "準備中"}`
+                  : "Mode: general")}{" "}
+              | ctx: problem.yaml / personas / logs
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 min-h-[56vh]">
+      <div className="flex-1 overflow-y-auto p-4 max-h-[45vh]">
         <div className="space-y-4">
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -173,12 +210,12 @@ export function ChatInterface() {
               </Card>
             </div>
           ))}
-          {isLoading && (
+          {(isLoading || isRunning) && (
             <div className="flex justify-start">
               <Card className="bg-card p-4">
                 <div className="flex items-center gap-2">
                   <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                  <p className="text-sm text-muted-foreground">分析中...</p>
+                  <p className="text-sm text-muted-foreground">{phaseAnimation || "分析中..."}</p>
                 </div>
               </Card>
             </div>
@@ -186,74 +223,107 @@ export function ChatInterface() {
         </div>
       </div>
 
-      <div className="border-t border-border bg-background px-4 py-2 overflow-x-auto whitespace-nowrap">
+      <div className="border-t border-border bg-background px-4 py-3 overflow-x-auto whitespace-nowrap">
         <div className="flex gap-2 items-center">
           <span className="text-xs text-muted-foreground mr-2">Pain:</span>
-          <span
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "#fecaca",
-              color: "#991b1b",
-              border: "1px solid #f87171",
-            }}
-          >
-            ●P-001 可視化不足
-          </span>
-          <span
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "#e5e7eb",
-              color: "#374151",
-              border: "1px solid #d1d5db",
-            }}
-          >
-            ○P-002 粒度不整合
-          </span>
-          <span
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "#e5e7eb",
-              color: "#374151",
-              border: "1px solid #d1d5db",
-            }}
-          >
-            ○P-003 面談調整遅延
-          </span>
+          {context.painAnalysis?.pains.map((pain, index) => (
+            <span
+              key={pain.id}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+              style={{
+                backgroundColor: pain.severity === "high" ? "#dc2626" : "#d97706",
+                color: "#ffffff",
+                border: `1px solid ${pain.severity === "high" ? "#dc2626" : "#d97706"}`,
+              }}
+            >
+              {pain.severity === "high" ? "●" : "○"}
+              {pain.id} {pain.title}
+            </span>
+          )) || (
+            <>
+              <span
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "#dc2626",
+                  color: "#ffffff",
+                  border: "1px solid #dc2626",
+                }}
+              >
+                ●P-001 可視化不足
+              </span>
+              <span
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "#d97706",
+                  color: "#ffffff",
+                  border: "1px solid #d97706",
+                }}
+              >
+                ○P-002 粒度不整合
+              </span>
+              <span
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "#d97706",
+                  color: "#ffffff",
+                  border: "1px solid #d97706",
+                }}
+              >
+                ○P-003 面談調整遅延
+              </span>
+            </>
+          )}
           <Button variant="link" size="sm" className="text-xs">
             すべて見る
           </Button>
 
           <span className="text-xs text-muted-foreground ml-4 mr-2">Agents:</span>
-          <span
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "#dbeafe",
-              color: "#1e40af",
-              border: "1px solid #93c5fd",
-            }}
-          >
-            resume-parser
-          </span>
-          <span
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "#dbeafe",
-              color: "#1e40af",
-              border: "1px solid #93c5fd",
-            }}
-          >
-            skill-normalizer
-          </span>
-          <span
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "#dbeafe",
-              color: "#1e40af",
-              border: "1px solid #93c5fd",
-            }}
-          >
-            matcher-core
-          </span>
+          {context.agentGeneration?.agents.map((agent, index) => (
+            <span
+              key={agent.id}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+              style={{
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                border: "1px solid #2563eb",
+              }}
+            >
+              {agent.name}
+            </span>
+          )) || (
+            <>
+              <span
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  border: "1px solid #2563eb",
+                }}
+              >
+                resume-parser
+              </span>
+              <span
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  border: "1px solid #2563eb",
+                }}
+              >
+                skill-normalizer
+              </span>
+              <span
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  border: "1px solid #2563eb",
+                }}
+              >
+                matcher-core
+              </span>
+            </>
+          )}
           <Button variant="link" size="sm" className="text-xs">
             一括Manifest
           </Button>
@@ -274,21 +344,31 @@ export function ChatInterface() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="課題について詳しく教えてください..."
-                className="min-h-[10rem] max-h-[22rem] resize-y text-lg leading-7"
+                onCompositionStart={handleCompositionStart}
+                onCompositionEnd={handleCompositionEnd}
+                placeholder={
+                  isComposing ? "Enterで確定、もう一度Enterで送信..." : "課題について詳しく教えてください..."
+                }
+                className="min-h-[6rem] max-h-[12rem] resize-y text-lg leading-7"
                 autoFocus
-                disabled={isLoading}
+                disabled={isLoading || isRunning}
               />
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-2">
-            <Button variant="outline" size="sm" type="button" onClick={handleAIExecution} disabled={isLoading}>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={handleAIExecution}
+              disabled={isLoading || isRunning || !input.trim()}
+            >
               <Zap className="w-4 h-4 mr-1" />
-              AI実行(解析→設計→出力)
+              {isRunning ? "実行中..." : "AI実行(解析→設計→出力)"}
             </Button>
-            <Button type="submit" size="sm" disabled={isLoading}>
+            <Button type="submit" size="sm" disabled={isLoading || isRunning || isComposing}>
               <Send className="w-4 h-4 mr-1" />
-              送信
+              {isComposing ? "確定" : "送信"}
             </Button>
           </div>
         </form>

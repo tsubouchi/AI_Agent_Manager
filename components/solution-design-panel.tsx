@@ -41,115 +41,182 @@ interface SolutionDesign {
   implementationSteps: Array<{ step: string; duration: string; dependencies: string[] }>
 }
 
-export function SolutionDesignPanel() {
-  const [solution] = useState<SolutionDesign>({
-    id: "SOL-001",
-    title: "候補者情報統合・可視化システム",
-    overview: "分散している候補者情報を統合し、AIによるスキル分析とマッチング精度向上を実現するソリューション",
-    components: [
-      {
-        id: "comp-1",
-        name: "データ収集・正規化",
-        type: "data",
-        description: "履歴書、GitHub、面談メモなどの分散データを収集・正規化",
-        dependencies: [],
-        outputs: ["normalized-data"],
-        complexity: 7,
-        estimatedHours: 40,
-        status: "planned",
-        position: { x: 50, y: 100 },
-      },
-      {
-        id: "comp-2",
-        name: "スキル抽出・分析",
-        type: "ai",
-        description: "NLPを使用してスキル情報を抽出・分析・カテゴライズ",
-        dependencies: ["normalized-data"],
-        outputs: ["skill-profile"],
-        complexity: 8,
-        estimatedHours: 60,
-        status: "planned",
-        position: { x: 250, y: 100 },
-      },
-      {
-        id: "comp-3",
-        name: "マッチングエンジン",
-        type: "ai",
-        description: "要件とスキルプロファイルのマッチング精度を向上",
-        dependencies: ["skill-profile"],
-        outputs: ["match-score"],
-        complexity: 9,
-        estimatedHours: 80,
-        status: "planned",
-        position: { x: 450, y: 100 },
-      },
-      {
-        id: "comp-4",
-        name: "統合ダッシュボード",
-        type: "ui",
-        description: "候補者情報の統合ビューとマッチング結果の可視化",
-        dependencies: ["match-score"],
-        outputs: ["dashboard"],
-        complexity: 6,
-        estimatedHours: 50,
-        status: "planned",
-        position: { x: 650, y: 100 },
-      },
-      {
-        id: "comp-5",
-        name: "フィードバック学習",
-        type: "ai",
-        description: "採用結果からのフィードバックでモデルを継続改善",
-        dependencies: ["match-score"],
-        outputs: ["improved-model"],
-        complexity: 8,
-        estimatedHours: 45,
-        status: "planned",
-        position: { x: 450, y: 250 },
-      },
-    ],
-    successMetrics: ["面談率 15%向上", "マッチング精度 20%向上", "採用期間 2週間短縮", "情報整理時間 70%削減"],
-    risks: [
-      {
-        risk: "データ品質のばらつき",
-        mitigation: "データクレンジングパイプラインの構築と品質監視",
-      },
-      {
-        risk: "プライバシー要件への対応",
-        mitigation: "データ匿名化とアクセス制御の実装",
-      },
-      {
-        risk: "既存システムとの連携",
-        mitigation: "段階的移行とAPIゲートウェイの活用",
-      },
-    ],
-    implementationSteps: [
-      {
-        step: "データ収集・正規化システム構築",
-        duration: "3週間",
-        dependencies: [],
-      },
-      {
-        step: "スキル抽出AIモデル開発",
-        duration: "4週間",
-        dependencies: ["データ収集・正規化システム構築"],
-      },
-      {
-        step: "マッチングエンジン実装",
-        duration: "5週間",
-        dependencies: ["スキル抽出AIモデル開発"],
-      },
-      {
-        step: "ダッシュボード開発",
-        duration: "3週間",
-        dependencies: ["マッチングエンジン実装"],
-      },
-      {
-        step: "フィードバック学習機能追加",
-        duration: "3週間",
-        dependencies: ["ダッシュボード開発"],
-      },
-    ],
+interface SolutionDesignPanelProps {
+  solutionDesign?: {
+    solutions: Array<{
+      id: string
+      title: string
+      description: string
+      painIds: string[]
+      approach: string
+      technology?: string
+      priority?: "high" | "medium" | "low"
+      effort?: string
+      impact?: string
+    }>
+  }
+}
+
+export function SolutionDesignPanel({ solutionDesign }: SolutionDesignPanelProps) {
+  const [solution] = useState<SolutionDesign>(() => {
+    if (solutionDesign?.solutions && solutionDesign.solutions.length > 0) {
+      const primarySolution = solutionDesign.solutions[0]
+      return {
+        id: primarySolution.id,
+        title: primarySolution.title,
+        overview: primarySolution.description,
+        components: [
+          {
+            id: "comp-1",
+            name: "データ収集・正規化",
+            type: "data",
+            description: primarySolution.approach,
+            dependencies: [],
+            outputs: ["normalized-data"],
+            complexity: 7,
+            estimatedHours: Number.parseInt(primarySolution.effort?.match(/\d+/)?.[0] || "40"),
+            status: "planned",
+            position: { x: 50, y: 100 },
+          },
+          {
+            id: "comp-2",
+            name: "処理エンジン",
+            type: "ai",
+            description: `${primarySolution.technology || "AI技術"}を使用した処理システム`,
+            dependencies: ["normalized-data"],
+            outputs: ["processed-data"],
+            complexity: 8,
+            estimatedHours: 60,
+            status: "planned",
+            position: { x: 250, y: 100 },
+          },
+        ],
+        successMetrics: [primarySolution.impact || "効率向上", "品質改善", "コスト削減"],
+        risks: [
+          {
+            risk: "技術的複雑性",
+            mitigation: "段階的実装とプロトタイプ検証",
+          },
+        ],
+        implementationSteps: [
+          {
+            step: primarySolution.title + "の実装",
+            duration: primarySolution.effort || "4週間",
+            dependencies: [],
+          },
+        ],
+      }
+    }
+
+    return {
+      id: "SOL-001",
+      title: "候補者情報統合・可視化システム",
+      overview: "分散している候補者情報を統合し、AIによるスキル分析とマッチング精度向上を実現するソリューション",
+      components: [
+        {
+          id: "comp-1",
+          name: "データ収集・正規化",
+          type: "data",
+          description: "履歴書、GitHub、面談メモなどの分散データを収集・正規化",
+          dependencies: [],
+          outputs: ["normalized-data"],
+          complexity: 7,
+          estimatedHours: 40,
+          status: "planned",
+          position: { x: 50, y: 100 },
+        },
+        {
+          id: "comp-2",
+          name: "スキル抽出・分析",
+          type: "ai",
+          description: "NLPを使用してスキル情報を抽出・分析・カテゴライズ",
+          dependencies: ["normalized-data"],
+          outputs: ["skill-profile"],
+          complexity: 8,
+          estimatedHours: 60,
+          status: "planned",
+          position: { x: 250, y: 100 },
+        },
+        {
+          id: "comp-3",
+          name: "マッチングエンジン",
+          type: "ai",
+          description: "要件とスキルプロファイルのマッチング精度を向上",
+          dependencies: ["skill-profile"],
+          outputs: ["match-score"],
+          complexity: 9,
+          estimatedHours: 80,
+          status: "planned",
+          position: { x: 450, y: 100 },
+        },
+        {
+          id: "comp-4",
+          name: "統合ダッシュボード",
+          type: "ui",
+          description: "候補者情報の統合ビューとマッチング結果の可視化",
+          dependencies: ["match-score"],
+          outputs: ["dashboard"],
+          complexity: 6,
+          estimatedHours: 50,
+          status: "planned",
+          position: { x: 650, y: 100 },
+        },
+        {
+          id: "comp-5",
+          name: "フィードバック学習",
+          type: "ai",
+          description: "採用結果からのフィードバックでモデルを継続改善",
+          dependencies: ["match-score"],
+          outputs: ["improved-model"],
+          complexity: 8,
+          estimatedHours: 45,
+          status: "planned",
+          position: { x: 450, y: 250 },
+        },
+      ],
+      successMetrics: ["面談率 15%向上", "マッチング精度 20%向上", "採用期間 2週間短縮", "情報整理時間 70%削減"],
+      risks: [
+        {
+          risk: "データ品質のばらつき",
+          mitigation: "データクレンジングパイプラインの構築と品質監視",
+        },
+        {
+          risk: "プライバシー要件への対応",
+          mitigation: "データ匿名化とアクセス制御の実装",
+        },
+        {
+          risk: "既存システムとの連携",
+          mitigation: "段階的移行とAPIゲートウェイの活用",
+        },
+      ],
+      implementationSteps: [
+        {
+          step: "データ収集・正規化システム構築",
+          duration: "3週間",
+          dependencies: [],
+        },
+        {
+          step: "スキル抽出AIモデル開発",
+          duration: "4週間",
+          dependencies: ["データ収集・正規化システム構築"],
+        },
+        {
+          step: "マッチングエンジン実装",
+          duration: "5週間",
+          dependencies: ["スキル抽出AIモデル開発"],
+        },
+        {
+          step: "ダッシュボード開発",
+          duration: "3週間",
+          dependencies: ["マッチングエンジン実装"],
+        },
+        {
+          step: "フィードバック学習機能追加",
+          duration: "3週間",
+          dependencies: ["ダッシュボード開発"],
+        },
+      ],
+    }
   })
 
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
@@ -239,6 +306,26 @@ export function SolutionDesignPanel() {
           </div>
         </div>
       </Card>
+
+      {/* Show additional solutions if available */}
+      {solutionDesign?.solutions && solutionDesign.solutions.length > 1 && (
+        <Card className="p-4">
+          <h4 className="font-medium mb-3">その他のソリューション候補</h4>
+          <div className="space-y-2">
+            {solutionDesign.solutions.slice(1).map((sol) => (
+              <div key={sol.id} className="flex items-center justify-between p-2 border rounded">
+                <div>
+                  <h5 className="text-sm font-medium">{sol.title}</h5>
+                  <p className="text-xs text-muted-foreground">{sol.description}</p>
+                </div>
+                <Badge variant={sol.priority === "high" ? "destructive" : "outline"} className="text-xs">
+                  {sol.priority || "medium"}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* DAG Visualization */}
       <Card className="p-4">

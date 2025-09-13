@@ -50,32 +50,79 @@ interface DeploymentStatus {
   revision?: string
 }
 
-export function CloudRunDeployment() {
-  const [config, setConfig] = useState<DeploymentConfig>({
-    projectId: "ai-agent-platform",
-    region: "asia-northeast1",
-    serviceName: "resume-parser-agent",
-    image: "asia-northeast1-docker.pkg.dev/ai-agent-platform/agents/resume-parser:latest",
-    port: 8080,
-    cpu: "1",
-    memory: "2Gi",
-    minInstances: 0,
-    maxInstances: 10,
-    concurrency: 80,
-    timeout: 300,
-    environmentVariables: {
-      OPENAI_API_KEY: "${OPENAI_API_KEY}",
-      SUPABASE_URL: "${SUPABASE_URL}",
-      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY}",
-    },
+interface CloudRunDeploymentProps {
+  deploymentConfig?: {
+    projectId: string
+    region: string
+    services: Array<{
+      name: string
+      image: string
+      manifest: any
+      deployCommand: string
+      buildCommand: string
+    }>
+    deploymentScript: string
+    status: string
+  }
+}
+
+export function CloudRunDeployment({ deploymentConfig: workflowDeploymentConfig }: CloudRunDeploymentProps) {
+  const [config, setConfig] = useState<DeploymentConfig>(() => {
+    if (workflowDeploymentConfig?.services && workflowDeploymentConfig.services.length > 0) {
+      const firstService = workflowDeploymentConfig.services[0]
+      return {
+        projectId: workflowDeploymentConfig.projectId,
+        region: workflowDeploymentConfig.region,
+        serviceName: firstService.name,
+        image: firstService.image,
+        port: firstService.manifest?.spec?.ports?.[0]?.containerPort || 8080,
+        cpu: firstService.manifest?.spec?.resources?.requests?.cpu || "1",
+        memory: firstService.manifest?.spec?.resources?.requests?.memory || "2Gi",
+        minInstances: 0,
+        maxInstances: 10,
+        concurrency: 80,
+        timeout: 300,
+        environmentVariables: firstService.manifest?.spec?.env?.reduce((acc: Record<string, string>, env: any) => {
+          acc[env.name] = env.value
+          return acc
+        }, {}) || {
+          OPENAI_API_KEY: "${OPENAI_API_KEY}",
+          SUPABASE_URL: "${SUPABASE_URL}",
+          SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY}",
+        },
+      }
+    }
+
+    return {
+      projectId: "ai-agent-platform",
+      region: "asia-northeast1",
+      serviceName: "resume-parser-agent",
+      image: "asia-northeast1-docker.pkg.dev/ai-agent-platform/agents/resume-parser:latest",
+      port: 8080,
+      cpu: "1",
+      memory: "2Gi",
+      minInstances: 0,
+      maxInstances: 10,
+      concurrency: 80,
+      timeout: 300,
+      environmentVariables: {
+        OPENAI_API_KEY: "${OPENAI_API_KEY}",
+        SUPABASE_URL: "${SUPABASE_URL}",
+        SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY}",
+      },
+    }
   })
 
   const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus>({
-    status: "idle",
+    status: workflowDeploymentConfig?.status === "ready" ? "idle" : "idle",
     progress: 0,
-    currentStep: "待機中",
+    currentStep: workflowDeploymentConfig?.status === "ready" ? "デプロイ準備完了" : "待機中",
     logs: [
-      { timestamp: "2024-01-15 10:30:00", level: "info", message: "デプロイメント準備完了" },
+      {
+        timestamp: "2024-01-15 10:30:00",
+        level: "info",
+        message: workflowDeploymentConfig?.status === "ready" ? "デプロイメント準備完了" : "デプロイメント準備完了",
+      },
       { timestamp: "2024-01-15 10:29:45", level: "info", message: "Manifest検証完了" },
       { timestamp: "2024-01-15 10:29:30", level: "info", message: "Docker イメージ確認済み" },
     ],
@@ -179,6 +226,26 @@ export function CloudRunDeployment() {
           </Badge>
         </div>
       </div>
+
+      {/* Show available services if workflow deployment config exists */}
+      {workflowDeploymentConfig?.services && workflowDeploymentConfig.services.length > 1 && (
+        <Card className="p-4">
+          <h4 className="font-medium mb-3">デプロイ対象サービス</h4>
+          <div className="space-y-2">
+            {workflowDeploymentConfig.services.map((service) => (
+              <div key={service.name} className="flex items-center justify-between p-2 border rounded">
+                <div>
+                  <h5 className="text-sm font-medium">{service.name}</h5>
+                  <p className="text-xs text-muted-foreground">{service.image}</p>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  準備完了
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Deployment Progress */}
       {deploymentStatus.status !== "idle" && (
@@ -296,6 +363,16 @@ export function CloudRunDeployment() {
               ))}
             </div>
           </Card>
+
+          {/* Show deployment script if available */}
+          {workflowDeploymentConfig?.deploymentScript && (
+            <Card className="p-4">
+              <h4 className="font-medium mb-4">デプロイメントスクリプト</h4>
+              <div className="bg-black text-green-400 p-4 rounded-lg font-mono text-sm max-h-64 overflow-y-auto">
+                <pre>{workflowDeploymentConfig.deploymentScript}</pre>
+              </div>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="resources" className="space-y-4">

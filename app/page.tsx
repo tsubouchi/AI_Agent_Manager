@@ -89,9 +89,9 @@ export default function HomePage() {
         <div className="flex-1 flex min-w-0 overflow-hidden">
           <div
             style={{ width: renderRightPanel() ? `${chatWidth}%` : "100%" }}
-            className="min-w-0 flex-shrink-0 overflow-hidden"
+            className="min-w-0 flex-shrink-0 overflow-hidden flex flex-col"
           >
-            {renderMainContent()}
+            <div className="flex-1 min-h-0">{renderMainContent()}</div>
           </div>
 
           {renderRightPanel() && (

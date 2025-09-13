@@ -133,14 +133,14 @@
   }
 
   .badge-pain-medium {
-    background-color: #4b5563 !important;
+    background-color: #d97706 !important;
     color: #ffffff !important;
-    border-color: #4b5563 !important;
+    border-color: #d97706 !important;
   }
 
   .badge-agent {
-    background-color: #dbeafe !important;
-    color: #1e40af !important;
-    border-color: #bfdbfe !important;
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+    border-color: #2563eb !important;
   }
 }
