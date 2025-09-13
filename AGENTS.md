@@ -1,41 +1,68 @@
-# Repository Guidelines
+# Repository Guidelines (Updated)
 
 ## Project Structure & Module Organization
 - `app/` Next.js App Router (pages, `layout.tsx`, API routes in `app/api/*`).
 - `components/` UI and feature components (kebab-case filenames; exported components in PascalCase). `components/ui/` holds design system parts.
-- `hooks/` React hooks (e.g., `use-workflow.ts`, exported as `useWorkflow`).
+- `hooks/` React hooks (e.g., `use-workflow.ts`, exported as `useWorkflow`; `use-chat-store.ts` for chat live stream state).
 - `lib/` Non-UI logic (e.g., `workflow-engine.ts` orchestrates stages and API calls).
+- `contract/` UI–DB契約の抽出・検証スクリプト（`extract-db.js`, `extract-ui.js`, `run.js`）。
 - `public/` static assets. `styles/` global styles (Tailwind CSS). Config: `next.config.mjs`, `tsconfig.json`, `postcss.config.mjs`.
+- `supabase/migrations/` SQL migrations（RLSや関数属性のハードニングを含む）。
 
 ## Build, Test, and Development Commands
-- `pnpm i` Install dependencies.
-- `pnpm dev` Run the Next.js dev server.
-- `pnpm build` Create a production build.
-- `pnpm start` Start the production server (after build).
-- `pnpm lint` Run ESLint via `next lint`.
+- `pnpm i` 依存関係のインストール。
+- `pnpm dev` Next.js 開発サーバ。
+- `pnpm build` 本番ビルド。
+- `pnpm start` 本番サーバ（ビルド後）。
+- `pnpm lint` ESLint 実行。内部で `scripts/lint.js` を通して `next lint` を起動。
+- `pnpm type-check` TypeScript チェック（`tsconfig.typecheck.json`）。API/Lib/Hooks に限定。
+- `pnpm contract` UI–DB契約の抽出・検証（詳細は下記）。
+- `pnpm test:all` `lint` → `type-check` → `contract` を順に実行。
+
+## UI–DB Contract（契約ファースト）
+- 目的: UIが期待する型とDBスキーマの不一致を早期検知。
+- 出力:
+  - `contract/db.json`（Supabase SQLから抽出）
+  - `contract/ui.json`（Zod/RESTから自動抽出、失敗時は `lib/contracts/ui-contract.json` にフォールバック）
+- 実行: `pnpm contract`
+  - 差分があれば詳細を表示して失敗。Validなら `Contract Valid ✓` を出力。
+- 注意:
+  - `contract/*.json` は生成物。直接編集しない。
+  - Zodの `.optional()` は「送信省略可」であって「null許容」ではない扱い。`.nullable()`/`.nullish()`のみ null 許容にマップ。
+
+## Streaming Chat（右パネル Live 連動）
+- API: `app/api/chat/route.ts` が OpenAIのストリームを中継し、`0:{json}\n` 形式で delta を返す。
+- クライアント:
+  - `components/chat-interface.tsx` がチャンク受信で `chatLiveStore.appendDelta(text)` を呼び、確定時に `commit()`。
+  - `components/output-panels.tsx` に「Live」タブを追加。ストリーム開始で自動選択され、リアルタイム表示。
+  - `hooks/use-chat-store.ts` は requestAnimationFrame で描画をスロットリング。
+- Realtime（任意/推奨）:
+  - Supabase Realtime を購読して別タブ/端末の INSERT を受信し、Liveに反映（自タブ分は去重）。
 
 ## Coding Style & Naming Conventions
-- Language: TypeScript, strict mode enabled. Imports use `@/*` alias.
-- Components: PascalCase exports; files kebab-case (`components/chat-interface.tsx`).
-- Hooks: `use-<name>.ts`, exported as `use<Name>`.
-- Utilities: in `lib/`; prefer named exports; camelCase identifiers.
-- Formatting/Linting: Follow ESLint (Next.js) rules; 2-space indentation; run `pnpm lint --fix` before committing.
-- Styling: Tailwind CSS; prefer utility classes over inline styles.
+- Language: TypeScript（strict）。Imports は `@/*` エイリアス。
+- Components: PascalCase export; file は kebab-case（例: `components/chat-interface.tsx`）。
+- Hooks: `use-<name>.ts`、export は `use<Name>`。
+- Utilities: `lib/` に配置、named export 推奨、camelCase。
+- Formatting/Linting: ESLint（Next.js）準拠、2-space インデント。コミット前に `pnpm lint --fix` 推奨。
+- Styling: Tailwind CSS。ユーティリティクラスを優先。
 
 ## Testing Guidelines
-- No test runner is configured yet. If adding tests:
-  - Unit: Jest/Vitest + React Testing Library; files `*.test.ts(x)` colocated or in `__tests__/`.
-  - E2E: Playwright; add `e2e/` and a `pnpm test:e2e` script.
-  - Keep fast, deterministic tests; include minimal fixtures.
+- まだテストランナーは未導入。追加する場合:
+  - Unit: Jest/Vitest + React Testing Library、`*.test.ts(x)` を同階層か `__tests__/` に配置。
+  - E2E: Playwright、`e2e/` と `pnpm test:e2e` を追加。
+  - 速く決定的なテスト、最小フィクスチャ。
 
 ## Commit & Pull Request Guidelines
-- Commits: Prefer Conventional Commits (`feat:`, `fix:`, `chore:`). Example: `feat: add pain analysis panel`.
-- PRs: Provide a clear summary, linked issues, screenshots for UI, and testing notes. Keep PRs focused and small.
+- Conventional Commits を推奨（`feat:`, `fix:`, `chore:` など）。
+- PR は小さく焦点を絞る。概要・関連Issue・UIのスクショ・検証手順を含める。
 
 ## Security & Configuration Tips
-- Secrets: Never commit them. Use `.env.local` (gitignored). Example: `OPENAI_API_KEY=...`. Client-exposed vars must start with `NEXT_PUBLIC_`.
-- Network calls: Server routes under `app/api/*` call OpenAI; validate inputs and handle errors.
+- Secrets はコミットしない。`.env.local` を利用。クライアント公開は `NEXT_PUBLIC_` で始める。
+- RLS/ポリシー: `supabase/migrations` にて有効化・更新。既存ファイルを書き換えず、新規マイグレーションを追加する。
+- API入力は Zod で検証し、エラーは適切にハンドリング。
 
 ## Architecture Overview
-- Workflow is orchestrated in `lib/workflow-engine.ts` with stages that call API routes (`app/api/workflow/*`).
-- UI is composed from `components/*`, driven by hooks from `hooks/*` and typed via `tsconfig.json`.
+- ワークフローは `lib/workflow-engine.ts` が `app/api/workflow/*` を順に呼び出しオーケストレーション。
+- UI は `components/*` で構成、`hooks/*` により駆動。型は `tsconfig.json` に基づく。
+- CI: `.github/workflows/ci.yml` が `pnpm test:all` を実行（lint/type/contract）。

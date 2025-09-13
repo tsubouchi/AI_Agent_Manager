@@ -1,3 +1,5 @@
+import { getAuthHeaders } from "@/lib/auth-headers"
+
 export interface WorkflowStage {
   id: string
   name: string
@@ -8,6 +10,7 @@ export interface WorkflowStage {
 
 export interface WorkflowContext {
   userInput: string
+  workflowId?: string
   painAnalysis?: {
     pains: Array<{
       id: string
@@ -92,6 +95,22 @@ export class WorkflowEngine {
     this.notify()
 
     try {
+      // Create workflow row in Supabase (optional)
+      try {
+        const auth = await getAuthHeaders()
+        const res = await fetch("/api/workflows", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...auth },
+          body: JSON.stringify({ input_text: userInput }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          this.context.workflowId = data.id
+        }
+      } catch (_) {
+        // ignore persistence errors
+      }
+
       // Phase 1: Pain Analysis with background analysis
       await this.executeStage("pain-analysis")
 
@@ -155,9 +174,42 @@ export class WorkflowEngine {
 
       this.stages[stageIndex].status = "completed"
       this.stages[stageIndex].result = result
+
+      // Persist stage result if workflowId is available
+      if (this.context.workflowId) {
+        try {
+          const auth = await getAuthHeaders()
+          await fetch("/api/workflow-stages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...auth },
+            body: JSON.stringify({
+              workflow_id: this.context.workflowId,
+              name: this.stages[stageIndex].name,
+              status: "completed",
+              result,
+            }),
+          })
+        } catch (_) {}
+      }
     } catch (error) {
       this.stages[stageIndex].status = "error"
       this.stages[stageIndex].error = error instanceof Error ? error.message : "Unknown error"
+
+      if (this.context.workflowId) {
+        try {
+          const auth = await getAuthHeaders()
+          await fetch("/api/workflow-stages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...auth },
+            body: JSON.stringify({
+              workflow_id: this.context.workflowId,
+              name: this.stages[stageIndex].name,
+              status: "error",
+              error: this.stages[stageIndex].error,
+            }),
+          })
+        } catch (_) {}
+      }
     }
 
     this.notify()
@@ -213,7 +265,22 @@ export class WorkflowEngine {
     })
 
     if (!response.ok) throw new Error("Manifest generation failed")
-    return await response.json()
+    const manifest = await response.json()
+    // Persist manifests if possible
+    if (this.context.workflowId && manifest?.agents?.length) {
+      try {
+        const auth = await getAuthHeaders()
+        await fetch("/api/manifests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...auth },
+          body: JSON.stringify({
+            workflow_id: this.context.workflowId,
+            agents: manifest.agents.map((a: any) => ({ agent_name: a.name, manifest: a.manifest })),
+          }),
+        })
+      } catch (_) {}
+    }
+    return manifest
   }
 
   private async executeDeploymentPrep() {
@@ -232,7 +299,6 @@ export class WorkflowEngine {
   public getStages() {
     return [...this.stages]
   }
-
   public getContext() {
     return { ...this.context }
   }

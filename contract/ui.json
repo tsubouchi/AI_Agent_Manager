@@ -1,0 +1,143 @@
+{
+  "tables": {
+    "definitions": {
+      "columns": {
+        "name": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "json"
+        }
+      }
+    },
+    "drafts": {
+      "columns": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "stakeholders": {
+          "type": "string"
+        },
+        "timeline": {
+          "type": "string"
+        },
+        "context": {
+          "type": "string"
+        }
+      }
+    },
+    "issues": {
+      "columns": {
+        "project_id": {
+          "type": "uuid"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string"
+        },
+        "assignee": {
+          "type": "string"
+        },
+        "due_date": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "number"
+        }
+      }
+    },
+    "manifests": {
+      "columns": {
+        "workflow_id": {
+          "type": "uuid"
+        },
+        "agent_name": {
+          "type": "string"
+        }
+      }
+    },
+    "members": {
+      "columns": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "messages": {
+      "columns": {
+        "workflow_id": {
+          "type": "uuid"
+        },
+        "role": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        }
+      }
+    },
+    "project_members": {
+      "columns": {
+        "project_id": {
+          "type": "uuid"
+        }
+      }
+    },
+    "projects": {
+      "columns": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "workflow_stages": {
+      "columns": {
+        "workflow_id": {
+          "type": "uuid"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "result": {
+          "type": "json"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "workflows": {
+      "columns": {
+        "input_text": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

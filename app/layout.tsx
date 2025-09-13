@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import { Suspense } from "react"
 import "./globals.css"
+import { AuthControls } from "@/components/auth-controls"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -28,6 +29,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
       <body className="font-sans">
+        <header className="w-full border-b border-border p-2 flex justify-end">
+          <AuthControls />
+        </header>
         <Suspense fallback={null}>{children}</Suspense>
       </body>
     </html>

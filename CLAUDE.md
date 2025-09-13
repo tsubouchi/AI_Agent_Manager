@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an AI Agent Manager application built with Next.js 14, TypeScript, and React. It's a platform for developing, managing, and deploying AI agents through a structured workflow system. The application is automatically synced with v0.app deployments.
+This is an AI Agent Manager application built with Next.js 14, TypeScript, and React. It's a platform for developing, managing, and deploying AI agents through a structured workflow system. The application is automatically synced with v0.app deployments and integrated with Vercel for deployment.
 
 ## Commands
 
@@ -17,7 +17,10 @@ npm run build        # Build the application for production
 npm run start        # Start production server
 
 # Code Quality
-npm run lint         # Run Next.js linting
+npm run lint         # Run custom linting script
+npm run type-check   # TypeScript type checking
+npm run contract     # Run contract validation
+npm run test:all     # Run all checks (lint, type-check, contract)
 ```
 
 ## Architecture
@@ -42,6 +45,19 @@ Each stage maintains its own state and passes context to subsequent stages throu
 - Uses React hooks for local state management
 - Workflow state managed through `WorkflowEngine` class with subscription pattern
 - Custom hook `use-workflow.ts` for workflow interaction
+- Live chat store (`use-chat-store.ts`) for real-time message handling
+- Authentication headers management (`lib/auth-headers.ts`) for API requests
+
+### Database Integration
+- **Supabase Backend**: PostgreSQL database with real-time capabilities
+- **Tables**:
+  - `workflows` - Main workflow records
+  - `workflow_stages` - Stage execution tracking
+  - `messages` - Chat message history
+  - `manifests` - Agent deployment manifests
+  - `projects`, `drafts` - Project management
+- **Security**: Row Level Security (RLS) enabled with development policies
+- **Extensions**: pgcrypto for UUID generation
 
 ### Styling
 - Tailwind CSS v4 with CSS variables for theming
@@ -56,9 +72,32 @@ The project has TypeScript and ESLint errors disabled in production builds (`nex
 
 This allows rapid prototyping but should be addressed for production readiness.
 
+## Environment Variables
+
+Required environment variables (see `.env.local.sample`):
+- `OPENAI_API_KEY` - OpenAI API key for AI features
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Public Supabase key
+- `SUPABASE_SERVICE_ROLE_KEY` - Server-side Supabase key (optional)
+- `SUPABASE_REQUIRE_JWT` - JWT enforcement on API routes (default: false)
+- PostgreSQL connection strings for database access
+
+## Dependencies
+
+Key dependencies added:
+- `@supabase/supabase-js` - Supabase client library
+- `yaml` - YAML parsing for manifest generation
+- ESLint configured for Next.js linting
+
 ## Path Aliases
 
 - `@/*` - Root directory
 - `@/components` - UI components
 - `@/lib` - Utility functions and core logic
 - `@/hooks` - Custom React hooks
+
+## Additional Resources
+
+- **AGENTS.md** - Detailed repository guidelines, coding standards, and architecture documentation
+- **Contract Validation** - UI-DB contract system in `contract/` directory for type safety
+- **Migrations** - Database schema in `supabase/migrations/` including RLS policies

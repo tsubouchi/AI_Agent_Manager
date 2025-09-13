@@ -7,6 +7,9 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
+import { getSupabaseClient } from "@/lib/supabase"
+import { chatLiveStore } from "@/hooks/use-chat-store"
+import { getAuthHeaders } from "@/lib/auth-headers"
 
 const Send = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -53,6 +56,7 @@ export function ChatInterface() {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const [nearBottom, setNearBottom] = useState(true)
+  const realtimeSeenIds = useRef<Set<string>>(new Set())
 
   const { stages, context, isRunning, startWorkflow, currentPhase } = useWorkflow()
 
@@ -81,6 +85,17 @@ export function ChatInterface() {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    // Persist user message if workflow exists
+    try {
+      if (context.workflowId) {
+        const auth = await getAuthHeaders()
+        await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...auth },
+          body: JSON.stringify({ workflow_id: context.workflowId, role: "user", content: input }),
+        })
+      }
+    } catch (_) {}
     setInput("")
     setIsLoading(true)
 
@@ -105,6 +120,7 @@ export function ChatInterface() {
       let assistantMessage = ""
 
       const assistantId = Date.now().toString()
+      chatLiveStore.start(assistantId, assistantId)
       setMessages((prev) => [
         ...prev,
         {
@@ -128,6 +144,8 @@ export function ChatInterface() {
                 const data = JSON.parse(line.slice(2))
                 if (data.type === "text-delta") {
                   assistantMessage += data.text
+                  // push to live store for right panel
+                  chatLiveStore.appendDelta(data.text)
                   setMessages((prev) =>
                     prev.map((msg) =>
                       msg.id === assistantId
@@ -157,14 +175,28 @@ export function ChatInterface() {
           ),
         )
       }
+      // finalize live stream
+      chatLiveStore.commit()
 
       if (assistantMessage.includes("課題") || assistantMessage.includes("問題") || input.includes("Pain")) {
         setTimeout(() => {
           startWorkflow(input)
         }, 1000)
       }
+      // Persist assistant message after streaming ends
+      try {
+        if (context.workflowId && assistantMessage) {
+          const auth = await getAuthHeaders()
+          await fetch("/api/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...auth },
+            body: JSON.stringify({ workflow_id: context.workflowId, role: "assistant", content: assistantMessage }),
+          })
+        }
+      } catch (_) {}
     } catch (error) {
       console.error("Chat error:", error)
+      chatLiveStore.commit()
       setMessages((prev) =>
         prev.map((msg) =>
           msg.role === "assistant" && msg.content === ""
@@ -273,6 +305,42 @@ export function ChatInterface() {
     // While new messages stream in, keep view pinned to bottom if user is near bottom
     if (nearBottom) scrollToBottom(true)
   }, [messages, isLoading, isRunning, isOcrLoading, phaseAnimation, nearBottom])
+
+  // Supabase Realtime subscription for messages (optional)
+  useEffect(() => {
+    try {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!url || !anon) return
+      const supabase = getSupabaseClient() as any
+      const channel = supabase
+        .channel("messages-stream")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "messages" },
+          (payload: any) => {
+            const row = payload.new
+            if (!row?.id) return
+            if (realtimeSeenIds.current.has(row.id)) return
+            if (context.workflowId && row.workflow_id && row.workflow_id !== context.workflowId) return
+            if (row.role === "user") return
+            realtimeSeenIds.current.add(row.id)
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === row.id)) return prev
+              return [...prev, { id: row.id, role: row.role, content: row.content }]
+            })
+          },
+        )
+        .subscribe()
+      return () => {
+        try {
+          supabase.removeChannel(channel)
+        } catch {}
+      }
+    } catch {
+      // optional
+    }
+  }, [context.workflowId])
 
   return (
     <div className="flex flex-col h-full bg-background">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -48,6 +48,9 @@ export function NewIssueFlow() {
     timeline: "",
     context: "",
   })
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const saveTimer = useRef<NodeJS.Timeout | null>(null)
 
   const handleNext = () => {
     if (step < 3) setStep(step + 1)
@@ -57,10 +60,70 @@ export function NewIssueFlow() {
     if (step > 1) setStep(step - 1)
   }
 
-  const handleSubmit = () => {
-    console.log("Creating new issue:", formData)
-    // Here you would typically save to database
+  const handleSubmit = async () => {
+    try {
+      setSaving("saving")
+      // Ensure latest save
+      await persistDraft()
+      setSaving("saved")
+      console.log("Issue saved:", { id: draftId, ...formData })
+      alert("下書きを保存しました。サイドバーに反映されます。")
+    } catch (e) {
+      console.error(e)
+      setSaving("error")
+      alert("保存に失敗しました。環境設定をご確認ください。")
+    }
   }
+
+  async function persistDraft() {
+    const payload = {
+      title: formData.title || "(無題の課題)",
+      description: formData.description || undefined,
+      priority: formData.priority || undefined,
+      category: formData.category || undefined,
+      stakeholders: formData.stakeholders || undefined,
+      timeline: formData.timeline || undefined,
+      context: formData.context || undefined,
+    }
+    if (!draftId) {
+      const res = await fetch("/api/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error("Create draft failed")
+      const created = (await res.json()) as { id: string }
+      setDraftId(created.id)
+      return created
+    } else {
+      const res = await fetch(`/api/drafts/${draftId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error("Update draft failed")
+      return await res.json()
+    }
+  }
+
+  // Auto-save (debounced) on form changes
+  useEffect(() => {
+    setSaving("saving")
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await persistDraft()
+        setSaving("saved")
+      } catch (e) {
+        console.error(e)
+        setSaving("error")
+      }
+    }, 800)
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData])
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -228,11 +291,16 @@ export function NewIssueFlow() {
             </Card>
           )}
 
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
             <Button variant="outline" onClick={handlePrev} disabled={step === 1}>
               戻る
             </Button>
             <div className="flex gap-2">
+              <span className="text-xs text-muted-foreground self-center min-w-[80px] text-right">
+                {saving === "saving" && "保存中..."}
+                {saving === "saved" && "保存済み"}
+                {saving === "error" && "保存失敗"}
+              </span>
               {step < 3 ? (
                 <Button onClick={handleNext}>次へ</Button>
               ) : (

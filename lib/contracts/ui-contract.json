@@ -1,0 +1,43 @@
+{
+  "$schema": "// simplified UI contract schema",
+  "tables": {
+    "workflows": {
+      "columns": {
+        "id": { "type": "uuid", "nullable": false },
+        "created_at": { "type": "timestamp", "nullable": false },
+        "user_id": { "type": "string", "nullable": true },
+        "input_text": { "type": "string", "nullable": false }
+      }
+    },
+    "workflow_stages": {
+      "columns": {
+        "id": { "type": "uuid", "nullable": false },
+        "workflow_id": { "type": "uuid", "nullable": false },
+        "name": { "type": "string", "nullable": false },
+        "status": { "type": "string", "nullable": false },
+        "result": { "type": "json", "nullable": true },
+        "error": { "type": "string", "nullable": true },
+        "created_at": { "type": "timestamp", "nullable": false }
+      }
+    },
+    "messages": {
+      "columns": {
+        "id": { "type": "uuid", "nullable": false },
+        "workflow_id": { "type": "uuid", "nullable": true },
+        "role": { "type": "string", "nullable": false },
+        "content": { "type": "string", "nullable": false },
+        "created_at": { "type": "timestamp", "nullable": false }
+      }
+    },
+    "manifests": {
+      "columns": {
+        "id": { "type": "uuid", "nullable": false },
+        "workflow_id": { "type": "uuid", "nullable": false },
+        "agent_name": { "type": "string", "nullable": false },
+        "manifest": { "type": "json", "nullable": false },
+        "created_at": { "type": "timestamp", "nullable": false }
+      }
+    }
+  }
+}
+

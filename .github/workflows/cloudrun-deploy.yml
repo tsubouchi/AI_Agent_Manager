@@ -1,0 +1,100 @@
+name: Cloud Run Deploy (Template)
+
+on:
+  workflow_dispatch:
+    inputs:
+      manifests_path:
+        description: Path to manifests YAML (multi-doc)
+        required: true
+        default: manifests.yaml
+      build_each:
+        description: Build & push each service image based on spec.image
+        required: false
+        default: 'false'
+      service_prefix:
+        description: Prefix for service name (optional)
+        required: false
+        default: ''
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker --quiet
+
+      - name: Install yq
+        run: |
+          YQ_VERSION=v4.44.3
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Parse manifests and deploy
+        env:
+          MANIFESTS_PATH: ${{ github.event.inputs.manifests_path }}
+          BUILD_EACH: ${{ github.event.inputs.build_each }}
+          SERVICE_PREFIX: ${{ github.event.inputs.service_prefix }}
+          REGION: ${{ secrets.CLOUD_RUN_REGION }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$MANIFESTS_PATH" ]; then
+            echo "Manifests file not found: $MANIFESTS_PATH" >&2
+            exit 1
+          fi
+
+          COUNT=$(yq eval 'split("---") | length' "$MANIFESTS_PATH")
+          echo "Found $COUNT manifest docs"
+
+          for i in $(seq 0 $((COUNT-1))); do
+            NAME=$(yq eval "(split(\"---\") | .[$i]) | .metadata.name" "$MANIFESTS_PATH")
+            IMAGE=$(yq eval "(split(\"---\") | .[$i]) | .spec.image" "$MANIFESTS_PATH")
+            ENVVARS=$(yq eval "(split(\"---\") | .[$i]) | (.spec.env // []) | map(.name+\"=\"+(.value // \"\")) | join(\",\")" "$MANIFESTS_PATH")
+            if [ "$NAME" = "null" ] || [ -z "$NAME" ]; then
+              echo "Skipping doc $i: missing metadata.name"
+              continue
+            fi
+            if [ "$IMAGE" = "null" ] || [ -z "$IMAGE" ]; then
+              echo "Skipping doc $i: missing spec.image"
+              continue
+            fi
+
+            SERVICE_NAME="$SERVICE_PREFIX$NAME"
+
+            if [ "$BUILD_EACH" = "true" ]; then
+              echo "Building image for $SERVICE_NAME -> $IMAGE"
+              docker build -t "$IMAGE" .
+              docker push "$IMAGE"
+            else
+              echo "Using prebuilt image: $IMAGE"
+            fi
+
+            echo "Deploying $SERVICE_NAME to Cloud Run"
+            if [ -n "$ENVVARS" ]; then
+              ENV_FLAG="--set-env-vars=$ENVVARS"
+            else
+              ENV_FLAG=""
+            fi
+
+            gcloud run deploy "$SERVICE_NAME" \
+              --image "$IMAGE" \
+              --region "$REGION" \
+              --platform managed \
+              --allow-unauthenticated $ENV_FLAG
+          done
+
+      - name: Upload manifests artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifests
+          path: ${{ github.event.inputs.manifests_path }}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState, useEffect, startTransition } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -9,6 +9,9 @@ import { SolutionDesignPanel } from "./solution-design-panel"
 import { AgentManifestEditor } from "./agent-manifest-editor"
 import { CloudRunDeployment } from "./cloud-run-deployment"
 import { useWorkflow } from "@/hooks/use-workflow"
+import { useChatLive } from "@/hooks/use-chat-store"
+ 
+import YAML from "yaml"
 
 // Simple SVG icon components to replace lucide-react
 const Play = ({ className }: { className?: string }) => (
@@ -28,13 +31,33 @@ const Upload = ({ className }: { className?: string }) => (
 export function OutputPanels() {
   const [activeTab, setActiveTab] = useState("pain")
   const { stages, context, isRunning } = useWorkflow()
+  const live = useChatLive(true)
+
+  // Auto-switch to Live tab only on rising edge (false -> true)
+  const switchedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!live.streaming || !live.sessionId) return
+    if (switchedFor.current === live.sessionId) return
+    startTransition(() => setActiveTab((prev) => (prev === "live" ? prev : "live")))
+    switchedFor.current = live.sessionId
+  }, [live.streaming, live.sessionId])
+
+  const deploymentResult = stages.find((s) => s.id === "deployment-prep")?.result
+  const [deployOverride, setDeployOverride] = useState<any | null>(null)
+  const [manifestOverride, setManifestOverride] = useState<any | null>(null)
+  const [regenLoading, setRegenLoading] = useState(false)
+  const [regenError, setRegenError] = useState<string | null>(null)
 
   return (
     <div className="bg-card border-l border-border p-2 md:p-4 flex flex-col h-full overflow-hidden">
       <div className="mb-4 flex-shrink-0">
         <h2 className="font-medium mb-2 text-sm md:text-base">出力タブ</h2>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-6 h-auto p-1">
+            <TabsTrigger value="live" className="text-xs px-1 py-2 min-w-0">
+              <span className="truncate">Live</span>
+              {live.streaming && <div className="w-2 h-2 bg-rose-500 rounded-full ml-1 animate-pulse"></div>}
+            </TabsTrigger>
             <TabsTrigger value="pain" className="text-xs px-1 py-2 min-w-0">
               <span className="truncate">Pain</span>
               {stages.find((s) => s.id === "pain-analysis")?.status === "running" && (
@@ -83,6 +106,15 @@ export function OutputPanels() {
           </TabsList>
 
           <div className="flex-1 overflow-hidden">
+            <TabsContent value="live" className="mt-4 h-full overflow-y-auto">
+              <Card className="p-3">
+                {live.assistantText ? (
+                  <pre className="whitespace-pre-wrap break-words text-sm">{live.assistantText}</pre>
+                ) : (
+                  <p className="text-sm text-muted-foreground">ライブ出力はここに表示されます。</p>
+                )}
+              </Card>
+            </TabsContent>
             <TabsContent value="pain" className="mt-4 h-full overflow-y-auto">
               <PainAnalysisPanel painAnalysis={context.painAnalysis} />
             </TabsContent>
@@ -99,43 +131,129 @@ export function OutputPanels() {
                     <Button size="sm">Manifest生成</Button>
                   </div>
                   <div className="space-y-2">
-                    {context.agentGeneration?.agents.map((agent) => (
+                    {context.agentGeneration?.agents?.map((agent) => (
                       <label key={agent.id} className="flex items-center space-x-2">
                         <input type="checkbox" className="rounded" defaultChecked />
                         <span className="text-sm">{agent.name}</span>
                         <span className="text-xs text-muted-foreground">({agent.description})</span>
                       </label>
-                    )) || (
-                      <>
-                        <label className="flex items-center space-x-2">
-                          <input type="checkbox" className="rounded" />
-                          <span className="text-sm">resume-parser</span>
-                        </label>
-                        <label className="flex items-center space-x-2">
-                          <input type="checkbox" className="rounded" />
-                          <span className="text-sm">skill-normalizer</span>
-                        </label>
-                        <label className="flex items-center space-x-2">
-                          <input type="checkbox" className="rounded" />
-                          <span className="text-sm">matcher-core</span>
-                        </label>
-                        <label className="flex items-center space-x-2">
-                          <input type="checkbox" className="rounded" />
-                          <span className="text-sm">fairness-review</span>
-                        </label>
-                      </>
+                    ))}
+                    {!context.agentGeneration?.agents?.length && (
+                      <div className="text-xs text-muted-foreground">エージェントはまだ生成されていません。</div>
                     )}
                   </div>
                 </div>
               </Card>
             </TabsContent>
 
-            <TabsContent value="manifest" className="mt-4 h-full overflow-y-auto">
+            <TabsContent value="manifest" className="mt-4 h-full overflow-y-auto space-y-4">
               <AgentManifestEditor manifest={context.manifest} />
+              {(manifestOverride || context.manifest)?.agents?.length ? (
+                <Card className="p-4">
+                  <h4 className="font-medium mb-3">生成済みYAMLプレビュー</h4>
+                  <div className="bg-black text-green-300 p-3 rounded font-mono text-xs whitespace-pre overflow-x-auto">
+                    <pre>
+                      {(manifestOverride || context.manifest).agents
+                        .map((a) => `---\n${YAML.stringify(a.manifest)}`)
+                        .join("\n")}
+                    </pre>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        try {
+                          const docs = (manifestOverride || context.manifest).agents
+                            .map((a) => `---\n${YAML.stringify(a.manifest)}`)
+                            .join("\n")
+                          const blob = new Blob([docs], { type: "text/yaml;charset=utf-8" })
+                          const url = URL.createObjectURL(blob)
+                          const aTag = document.createElement("a")
+                          aTag.href = url
+                          aTag.download = "manifests.yaml"
+                          document.body.appendChild(aTag)
+                          aTag.click()
+                          document.body.removeChild(aTag)
+                          URL.revokeObjectURL(url)
+                        } catch {}
+                      }}
+                    >
+                      YAMLダウンロード
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => document.getElementById("yaml-import-input")?.click()}
+                    >
+                      YAMLインポート
+                    </Button>
+                    <input
+                      id="yaml-import-input"
+                      type="file"
+                      accept=".yml,.yaml"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const text = await file.text()
+                        try {
+                          const docs = YAML.parseAllDocuments(text).map((d) => d.toJSON())
+                          const agents = docs
+                            .filter(Boolean)
+                            .map((m: any) => ({ name: m?.metadata?.name || "agent", manifest: m }))
+                          if (agents.length) {
+                            setManifestOverride({ agents })
+                          }
+                        } catch (err) {
+                          console.error("YAML import failed", err)
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={regenLoading}
+                      onClick={async () => {
+                        setRegenLoading(true)
+                        setRegenError(null)
+                        try {
+                          const res = await fetch("/api/workflow/deployment-prep", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ manifest: manifestOverride || context.manifest }),
+                          })
+                          if (!res.ok) throw new Error(await res.text())
+                          const data = await res.json()
+                          setDeployOverride(data)
+                          setActiveTab("cloudrun")
+                        } catch (e: any) {
+                          setRegenError(e?.message || "再生成に失敗しました")
+                        } finally {
+                          setRegenLoading(false)
+                        }
+                      }}
+                    >
+                      Cloud Run スクリプト再生成
+                    </Button>
+                    {regenError && <span className="text-xs text-red-500">{regenError}</span>}
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-4">
+                  <p className="text-sm text-muted-foreground">マニフェストはまだ生成されていません。</p>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="cloudrun" className="mt-4 h-full overflow-y-auto">
-              <CloudRunDeployment deploymentConfig={stages.find((s) => s.id === "deployment-prep")?.result} />
+              {(deployOverride || deploymentResult) ? (
+                <CloudRunDeployment deploymentConfig={deployOverride || deploymentResult} />
+              ) : (
+                <Card className="p-4">
+                  <p className="text-sm text-muted-foreground">デプロイ準備情報はまだありません。</p>
+                </Card>
+              )}
             </TabsContent>
           </div>
         </Tabs>

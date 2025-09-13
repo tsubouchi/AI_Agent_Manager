@@ -367,7 +367,34 @@ export function CloudRunDeployment({ deploymentConfig: workflowDeploymentConfig 
           {/* Show deployment script if available */}
           {workflowDeploymentConfig?.deploymentScript && (
             <Card className="p-4">
-              <h4 className="font-medium mb-4">デプロイメントスクリプト</h4>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium">デプロイメントスクリプト</h4>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigator.clipboard.writeText(workflowDeploymentConfig.deploymentScript)}
+                >
+                  コマンドをコピー
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const blob = new Blob([workflowDeploymentConfig.deploymentScript], {
+                      type: "text/x-shellscript;charset=utf-8",
+                    })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement("a")
+                    a.href = url
+                    a.download = "deploy-cloudrun.sh"
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                  }}
+                >
+                  .sh をダウンロード
+                </Button>
+              </div>
               <div className="bg-black text-green-400 p-4 rounded-lg font-mono text-sm max-h-64 overflow-y-auto">
                 <pre>{workflowDeploymentConfig.deploymentScript}</pre>
               </div>
@@ -375,7 +402,35 @@ export function CloudRunDeployment({ deploymentConfig: workflowDeploymentConfig 
           )}
         </TabsContent>
 
-        <TabsContent value="resources" className="space-y-4">
+      <TabsContent value="resources" className="space-y-4">
+        {workflowDeploymentConfig?.services?.length ? (
+          <Card className="p-4">
+            <h4 className="font-medium mb-4">サービス別コマンド</h4>
+            <div className="space-y-3">
+              {workflowDeploymentConfig.services.map((svc) => (
+                <div key={svc.name} className="p-3 border rounded">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <div className="text-sm font-medium">{svc.name}</div>
+                      <div className="text-xs text-muted-foreground">{svc.image}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(svc.buildCommand)}>
+                        Buildコマンドをコピー
+                      </Button>
+                      <Button size="sm" onClick={() => navigator.clipboard.writeText(svc.deployCommand)}>
+                        Deployコマンドをコピー
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="bg-black text-green-400 p-3 rounded font-mono text-xs max-h-40 overflow-y-auto">
+                    <pre>{svc.buildCommand}\n{svc.deployCommand}</pre>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : null}
           <Card className="p-4">
             <h4 className="font-medium mb-4 flex items-center gap-2">
               <Cpu className="w-4 h-4" />

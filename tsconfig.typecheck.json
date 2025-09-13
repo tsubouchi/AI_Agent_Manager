@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "app/api/**/*.ts",
+    "lib/**/*.ts",
+    "hooks/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "components",
+    "app/**/page.tsx",
+    "app/**/layout.tsx",
+    "app/**/*.tsx"
+  ]
+}
+

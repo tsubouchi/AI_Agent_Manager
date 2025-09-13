@@ -1,0 +1,382 @@
+{
+  "enums": {
+    "workflow_status": [
+      "pending",
+      "running",
+      "completed",
+      "error"
+    ],
+    "chat_role": [
+      "user",
+      "assistant",
+      "system"
+    ]
+  },
+  "tables": {
+    "workflows": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        },
+        "user_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "input_text": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    },
+    "workflow_stages": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "workflow_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false,
+          "references": {
+            "table": "workflows",
+            "column": "id"
+          }
+        },
+        "name": {
+          "type": "string",
+          "nullable": false
+        },
+        "status": {
+          "type": "enum",
+          "name": "workflow_status",
+          "values": [
+            "pending",
+            "running",
+            "completed",
+            "error"
+          ],
+          "nullable": false
+        },
+        "result": {
+          "type": "json",
+          "nullable": true
+        },
+        "error": {
+          "type": "string",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        }
+      }
+    },
+    "messages": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "workflow_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": true,
+          "references": {
+            "table": "workflows",
+            "column": "id"
+          }
+        },
+        "role": {
+          "type": "enum",
+          "name": "chat_role",
+          "values": [
+            "user",
+            "assistant",
+            "system"
+          ],
+          "nullable": false
+        },
+        "content": {
+          "type": "string",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        }
+      }
+    },
+    "manifests": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "workflow_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false,
+          "references": {
+            "table": "workflows",
+            "column": "id"
+          }
+        },
+        "agent_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "manifest": {
+          "type": "json",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        }
+      }
+    },
+    "projects": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "name": {
+          "type": "string",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        }
+      }
+    },
+    "drafts": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "title": {
+          "type": "string",
+          "nullable": false
+        },
+        "description": {
+          "type": "string",
+          "nullable": true
+        },
+        "priority": {
+          "type": "string",
+          "nullable": true
+        },
+        "category": {
+          "type": "string",
+          "nullable": true
+        },
+        "stakeholders": {
+          "type": "string",
+          "nullable": true
+        },
+        "timeline": {
+          "type": "string",
+          "nullable": true
+        },
+        "context": {
+          "type": "string",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        }
+      }
+    },
+    "definitions": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "name": {
+          "type": "string",
+          "nullable": true
+        },
+        "filename": {
+          "type": "string",
+          "nullable": true
+        },
+        "title": {
+          "type": "string",
+          "nullable": true
+        },
+        "content": {
+          "type": "json",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        }
+      }
+    },
+    "issues": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false,
+          "references": {
+            "table": "projects",
+            "column": "id"
+          }
+        },
+        "title": {
+          "type": "string",
+          "nullable": false
+        },
+        "status": {
+          "type": "string",
+          "nullable": false
+        },
+        "--": {
+          "type": "low",
+          "nullable": true
+        },
+        "priority": {
+          "type": "string",
+          "nullable": true
+        },
+        "assignee": {
+          "type": "string",
+          "nullable": true
+        },
+        "due_date": {
+          "type": "string",
+          "format": "date",
+          "nullable": true
+        },
+        "progress": {
+          "type": "number",
+          "format": "int",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        }
+      }
+    },
+    "members": {
+      "columns": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false
+        },
+        "name": {
+          "type": "string",
+          "nullable": false
+        },
+        "avatar_url": {
+          "type": "string",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        }
+      }
+    },
+    "project_members": {
+      "columns": {
+        "project_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false,
+          "references": {
+            "table": "projects",
+            "column": "id"
+          }
+        },
+        "member_id": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": false,
+          "references": {
+            "table": "members",
+            "column": "id"
+          }
+        },
+        "role": {
+          "type": "string",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": false
+        },
+        "primary": {
+          "type": "key",
+          "nullable": false
+        },
+        "member_id)": {
+          "type": "",
+          "nullable": true
+        }
+      }
+    }
+  }
+}

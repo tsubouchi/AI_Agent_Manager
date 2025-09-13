@@ -61,82 +61,25 @@ export function AgentManifestEditor({ manifest: workflowManifest }: AgentManifes
     if (workflowManifest?.agents) {
       return workflowManifest.agents.map((agent) => agent.name)
     }
-    return ["resume-parser", "skill-normalizer"]
+    return []
   })
 
   const [activeAgent, setActiveAgent] = useState<string>(() => {
     if (workflowManifest?.agents && workflowManifest.agents.length > 0) {
       return workflowManifest.agents[0].name
     }
-    return "resume-parser"
+    return ""
   })
 
   const [validationStatus, setValidationStatus] = useState<"valid" | "invalid" | "pending">("valid")
   const [viewMode, setViewMode] = useState<"form" | "yaml">("form")
 
-  const [manifest, setManifest] = useState<AgentManifest>(() => {
+  const [manifest, setManifest] = useState<AgentManifest | null>(() => {
     if (workflowManifest?.agents && workflowManifest.agents.length > 0) {
       const firstAgent = workflowManifest.agents[0]
       return firstAgent.manifest
     }
-
-    return {
-      apiVersion: "v1",
-      kind: "Agent",
-      metadata: {
-        name: "resume-parser",
-        version: "1.0.0",
-        owner: "hr-automation-team",
-      },
-      spec: {
-        role: "履歴書やプロフィール情報からスキル・経験を抽出・正規化し、構造化データとして出力する",
-        inputs: [
-          { name: "resume_text", schema: "#/schemas/ResumeText" },
-          { name: "profile_data", schema: "#/schemas/ProfileData" },
-        ],
-        outputs: [
-          { name: "structured_profile", schema: "#/schemas/StructuredProfile" },
-          { name: "skill_tags", schema: "#/schemas/SkillTags" },
-        ],
-        tasks: [
-          "テキストから技術スキル・経験年数を抽出",
-          "スキル名の正規化・カテゴライズ",
-          "経験レベルの推定・評価",
-          "構造化プロフィールデータの生成",
-        ],
-        tools: [
-          {
-            name: "llm",
-            type: "openai",
-            params: {
-              model: "gpt-4o-mini",
-              temperature: 0.1,
-            },
-          },
-          {
-            name: "supabase",
-            type: "database",
-            params: {
-              table: "candidate_profiles",
-            },
-          },
-        ],
-        policies: {
-          sla: { timeout_sec: 60, retries: 2 },
-          pii: { mask: ["email", "phone", "address"] },
-          fairness: { deny_features: ["age_bias", "gender_bias"] },
-        },
-        runtime: {
-          type: "cloud-run",
-          image: "asia-northeast1-docker.pkg.dev/project/agents/resume-parser:1.0.0",
-          env: ["OPENAI_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
-        },
-        observability: {
-          tracing: true,
-          log_level: "info",
-        },
-      },
-    }
+    return null
   })
 
   const availableAgents = workflowManifest?.agents
@@ -148,12 +91,7 @@ export function AgentManifestEditor({ manifest: workflowManifest }: AgentManifes
           .join(" "),
         description: `${agent.name}エージェント`,
       }))
-    : [
-        { id: "resume-parser", name: "Resume Parser", description: "履歴書解析エージェント" },
-        { id: "skill-normalizer", name: "Skill Normalizer", description: "スキル正規化エージェント" },
-        { id: "matcher-core", name: "Matcher Core", description: "マッチングエンジン" },
-        { id: "fairness-review", name: "Fairness Review", description: "公平性チェックエージェント" },
-      ]
+    : []
 
   const handleActiveAgentChange = (agentName: string) => {
     setActiveAgent(agentName)
@@ -339,11 +277,14 @@ spec:
               </div>
             </label>
           ))}
+          {!availableAgents.length && (
+            <div className="text-xs text-muted-foreground">マニフェストはまだ生成されていません。</div>
+          )}
         </div>
       </Card>
 
       {/* Active Agent Editor */}
-      {selectedAgents.length > 0 && (
+      {selectedAgents.length > 0 && manifest && (
         <Card className="p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">

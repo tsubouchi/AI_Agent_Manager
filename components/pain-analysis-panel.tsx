@@ -38,7 +38,7 @@ interface PainAnalysisPanelProps {
 export function PainAnalysisPanel({ painAnalysis }: PainAnalysisPanelProps) {
   const [painPoints, setPainPoints] = useState<PainPoint[]>(() => {
     if (painAnalysis?.pains) {
-      return painAnalysis.pains.map((pain, index) => ({
+      return painAnalysis.pains.map((pain) => ({
         id: pain.id,
         title: pain.title,
         severity: pain.severity,
@@ -51,59 +51,7 @@ export function PainAnalysisPanel({ painAnalysis }: PainAnalysisPanelProps) {
         expanded: false,
       }))
     }
-
-    return [
-      {
-        id: "P-001",
-        title: "候補者可視化不足",
-        severity: "high",
-        impact: ["面談率低下 (-15%)", "マッチング精度低下 (-20%)", "採用期間延長 (+2週間)"],
-        stakeholders: ["採用担当者", "エンジニアリングマネージャー", "候補者"],
-        constraints: ["既存システムとの連携", "データ品質のばらつき", "プライバシー要件"],
-        priority: 95,
-        description:
-          "現在の候補者情報が断片的で、スキルや経験の全体像が把握しにくい状況。履歴書、GitHub、面談メモが分散しており、総合的な評価が困難。",
-        evidence: [
-          "面談官アンケート: 78%が「情報不足で判断困難」と回答",
-          "採用データ分析: 情報整理に平均45分/候補者を要している",
-          "エンジニア面談: 技術スキル把握に追加質問が平均12回必要",
-        ],
-        expanded: false,
-      },
-      {
-        id: "P-002",
-        title: "要件粒度の不整合",
-        severity: "medium",
-        impact: ["見積もり精度低下 (-25%)", "開発効率低下 (-10%)", "コミュニケーションコスト増加"],
-        stakeholders: ["プロダクトマネージャー", "開発チーム", "ステークホルダー"],
-        constraints: ["チーム間の認識齟齬", "文書化プロセスの未整備", "時間的制約"],
-        priority: 70,
-        description:
-          "プロジェクトごとに要件の詳細度がバラバラで、見積もり精度に影響。一部は過度に詳細、一部は抽象的すぎる状況。",
-        evidence: [
-          "プロジェクト分析: 要件粒度の標準偏差が2.3（理想値: 0.8以下）",
-          "見積もり精度: 実績との乖離が平均28%",
-          "チーム調査: 67%が「要件理解に時間がかかる」と回答",
-        ],
-        expanded: false,
-      },
-      {
-        id: "P-003",
-        title: "面談調整の遅延",
-        severity: "low",
-        impact: ["候補者離脱率増加 (+8%)", "採用プロセス延長", "機会損失"],
-        stakeholders: ["人事担当者", "面談官", "候補者"],
-        constraints: ["カレンダー連携の複雑さ", "時差の考慮", "緊急対応の必要性"],
-        priority: 45,
-        description: "面談スケジュール調整に時間がかかり、候補者体験に悪影響。手動調整が多く、効率化が必要。",
-        evidence: [
-          "調整時間分析: 平均3.2日（目標: 1日以内）",
-          "候補者フィードバック: 42%が「レスポンスが遅い」と指摘",
-          "面談官負荷: 調整業務に週平均2.5時間を消費",
-        ],
-        expanded: false,
-      },
-    ]
+    return []
   })
 
   const toggleExpanded = (id: string) => {
@@ -139,10 +87,14 @@ export function PainAnalysisPanel({ painAnalysis }: PainAnalysisPanelProps) {
           <AlertTriangle className="w-4 h-4" />
           Pain分析結果
         </h3>
-        <Badge variant="outline" className="text-xs">
-          {painPoints.length}件の課題を特定
-        </Badge>
+        <Badge variant="outline" className="text-xs">{painPoints.length}件の課題</Badge>
       </div>
+
+      {!painPoints.length && (
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Pain分析結果はまだありません。</p>
+        </Card>
+      )}
 
       <div className="space-y-3">
         {painPoints.map((point) => (

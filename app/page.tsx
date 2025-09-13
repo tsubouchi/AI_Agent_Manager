@@ -73,12 +73,7 @@ export default function HomePage() {
     }
   }
 
-  const renderRightPanel = () => {
-    if (currentView === "chat") {
-      return <OutputPanels />
-    }
-    return null
-  }
+  const showRightPanel = currentView === "chat"
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
@@ -104,20 +99,20 @@ export default function HomePage() {
 
         <div className="flex-1 flex min-w-0 overflow-hidden">
           <div
-            style={{ width: renderRightPanel() ? `${chatWidth}%` : "100%" }}
+            style={{ width: showRightPanel ? `${chatWidth}%` : "100%" }}
             className="min-w-0 flex-shrink-0 overflow-hidden flex flex-col"
           >
             <div className="flex-1 min-h-0">{renderMainContent()}</div>
           </div>
 
-          {renderRightPanel() && (
+          {showRightPanel && (
             <>
               <div
                 className="w-1 bg-border hover:bg-primary/50 cursor-col-resize transition-colors flex-shrink-0"
                 onMouseDown={handleResize}
               />
               <div style={{ width: `${100 - chatWidth}%` }} className="min-w-0 flex-shrink-0 overflow-hidden">
-                {renderRightPanel()}
+                <OutputPanels />
               </div>
             </>
           )}
