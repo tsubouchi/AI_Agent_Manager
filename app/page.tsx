@@ -11,7 +11,23 @@ import { ProjectManagement } from "@/components/project-management"
 import { ImportCommand } from "@/components/import-command"
 import { DraftsManager } from "@/components/drafts-manager"
 import { Button } from "@/components/ui/button"
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
+
+// Simple SVG icon components to replace lucide-react
+const PanelLeftOpen = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+    <path d="M9 3v18" />
+    <path d="m14 9 3 3-3 3" />
+  </svg>
+)
+
+const PanelLeftClose = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+    <path d="M9 3v18" />
+    <path d="m16 15-3-3 3-3" />
+  </svg>
+)
 
 export default function HomePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)

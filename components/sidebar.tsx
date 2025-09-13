@@ -1,8 +1,30 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Plus, Command, Upload } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
+
+// Simple SVG icon components to replace lucide-react
+const Plus = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M5 12h14" />
+    <path d="m12 5 7 7-7 7" />
+  </svg>
+)
+
+const Command = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="m15 6-6 6 6 6" />
+    <path d="m9 6 6 6-6 6" />
+  </svg>
+)
+
+const Upload = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7,10 12,15 17,10" />
+    <line x1="12" x2="12" y1="15" y2="3" />
+  </svg>
+)
 
 export function Sidebar() {
   const router = useRouter()
